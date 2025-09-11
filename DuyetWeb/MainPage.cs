@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.IO;
 
 namespace DuyetWeb
 {
@@ -66,26 +67,63 @@ namespace DuyetWeb
             m_objProcessMonitorTimer.Start();
         }
 
-        private void MainPage_FormClosed(object sender, FormClosedEventArgs e)
+        private async void MainPage_FormClosed(object sender, FormClosedEventArgs e)
         {
+            // Dừng & giải phóng timer
             if (m_objProcessMonitorTimer != null)
             {
-                m_objProcessMonitorTimer.Stop();
-                m_objProcessMonitorTimer.Tick -= ProcessMonitorTimer_Tick;
-                m_objProcessMonitorTimer.Dispose();
-                m_objProcessMonitorTimer = null;
+                try
+                {
+                    m_objProcessMonitorTimer.Stop();
+                    m_objProcessMonitorTimer.Tick -= ProcessMonitorTimer_Tick;
+                    m_objProcessMonitorTimer.Dispose();
+                }
+                catch { /* ignore */ }
+                finally { m_objProcessMonitorTimer = null; }
             }
 
+            // Xoá dữ liệu duyệt TRƯỚC khi Dispose WebView2
+            if (webView != null && webView.CoreWebView2 != null)
+            {
+                try
+                {
+                    var profile = webView.CoreWebView2.Profile;
+
+                    // GỘP MỌI CỜ BROWSING-DATA CÓ SẴN Ở PHIÊN BẢN SDK HIỆN TẠI
+                    var kindsCombined = (CoreWebView2BrowsingDataKinds)0;
+                    foreach (CoreWebView2BrowsingDataKinds k in Enum.GetValues(typeof(CoreWebView2BrowsingDataKinds)))
+                    {
+                        // Bỏ qua 0 nếu có
+                        if (Convert.ToInt64(k) != 0)
+                            kindsCombined |= k;
+                    }
+
+                    // Xoá theo tập cờ đã gộp
+                    await profile.ClearBrowsingDataAsync(kindsCombined);
+
+                    // Xoá cookie runtime
+                    try { webView.CoreWebView2.CookieManager.DeleteAllCookies(); } catch { /* ignore */ }
+                }
+                catch { /* ignore */ }
+            }
+
+            // 3) Bỏ đăng ký sự kiện & Dispose WebView2
             if (webView != null)
             {
-                if (webView.CoreWebView2 != null)
+                try
                 {
-                    webView.NavigationStarting -= WebView_NavigationStarting;
-                    webView.CoreWebView2.NewWindowRequested -= CoreWebView2_NewWindowRequested;
+                    if (webView.CoreWebView2 != null)
+                    {
+                        webView.NavigationStarting -= WebView_NavigationStarting;
+                        webView.CoreWebView2.NewWindowRequested -= CoreWebView2_NewWindowRequested;
+                    }
                 }
-                webView.Dispose();
+                catch { /* ignore */ }
+
+                try { webView.Dispose(); } catch { /* ignore */ }
             }
         }
+
         #endregion
 
         #region ==== Guards ====
