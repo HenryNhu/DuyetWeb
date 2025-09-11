@@ -33,7 +33,7 @@ namespace DuyetWeb
         // Danh sách trình duyệt block
         private readonly HashSet<string> m_dicBrowsersToBlock = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            // "msedge", // Edge gốc
+            "msedge", // Edge gốc
             "chrome",
             "firefox",
             "opera",
